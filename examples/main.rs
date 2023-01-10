@@ -10,7 +10,7 @@ struct Canvas<'a> {
 }
 
 impl Canvas<'_> {
-    fn fill(mut self, color: u32) {
+    fn fill(&mut self, color: u32) {
         argel::fill(&mut self.pixels, color);
     }
 }
@@ -19,13 +19,14 @@ fn main() {
 
     let mut pixels: [u32; HEIGHT * WIDTH] = [0; HEIGHT * WIDTH];
 
-    let canvas: Canvas = Canvas {
+    let mut canvas: Canvas = Canvas {
         width: WIDTH,
         height: HEIGHT,
         pixels: &mut pixels,
     };
 
-    canvas.fill(0x0000FF);
+    canvas.fill(0x00FF00);
     println!("{}", canvas.width);
     println!("{}", canvas.height);
+    println!("{}", canvas.pixels[0]);
 }
