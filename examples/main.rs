@@ -16,7 +16,6 @@ impl Canvas<'_> {
 }
 
 fn main() {
-
     let mut pixels: [u32; HEIGHT * WIDTH] = [0; HEIGHT * WIDTH];
 
     let mut canvas: Canvas = Canvas {
