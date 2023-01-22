@@ -1,21 +1,92 @@
-pub fn fill(pixels: &mut [u32], color: u32) {
-    for i in 0..pixels.len() {
-        pixels[i] = color;
+#![warn(clippy::all)]
+use std::{fs::File, io::Write};
+
+pub struct Canvas {
+    pub width: usize,
+    pub height: usize,
+    pub stride: usize,
+    pub pixels: Vec<u32>,
+}
+
+impl Canvas {
+    #[must_use]
+    pub fn new(width: usize, height: usize) -> Canvas {
+        let pixels = vec![0; width * height];
+        Canvas {
+            width,
+            height,
+            stride: width,
+            pixels,
+        }
+    }
+
+    pub fn fill(&mut self, color: u32) {
+        for i in 0..self.width * self.height {
+            self.pixels[i] = color;
+        }
+    }
+
+    pub fn draw<F: Fn(&mut Canvas, (isize, isize), u32)>(
+        &mut self,
+        x: isize,
+        y: isize,
+        draw_fn: F,
+        color: u32,
+    ) {
+        draw_fn(self, (x, y), color);
+    }
+
+    pub fn get_pixel(&self, x: usize, y: usize) -> Result<(u8, u8, u8), &'static str> {
+        assert_pixel(&self.pixels, self.width, self.height, x, y)?;
+
+        let pixel = self.pixels[y * self.width + x];
+        let red = (pixel >> 16) as u8;
+        let green = (pixel >> 8) as u8;
+        let blue = pixel as u8;
+        Ok((red, green, blue))
+    }
+
+    pub fn set_pixel(&mut self, x: usize, y: usize, color: u32) -> Result<(), &str> {
+        assert_pixel(&self.pixels, self.width, self.height, x, y)?;
+
+        self.pixels[y * self.width + x] = color;
+        Ok(())
     }
 }
 
-// pub fn set_pixel(pixels: &mut [u32], width: usize, height: usize, x: usize, y: usize, color: u32) {
-//     const i = x *
-//     pixels[i] = color;
-// }
+pub fn rect(w: isize, h: isize) -> impl Fn(&mut Canvas, (isize, isize), u32) {
+    move |canvas: &mut Canvas, position, color| {
+        let (mut x1, mut y1) = position;
 
-pub fn get_pixel_color(
+        let mut x2: isize = x1 + w.signum() * (w.abs() - 1);
+        let mut y2: isize = y1 + h.signum() * (h.abs() - 1);
+        if x1 > x2 {
+            std::mem::swap(&mut x1, &mut x2);
+        };
+        if y1 > y2 {
+            std::mem::swap(&mut y1, &mut y2);
+        };
+
+        for y in y1..=y2 {
+            if 0 <= y && y < canvas.height as isize {
+                for x in x1..=x2 {
+                    if 0 <= x && x < canvas.width as isize {
+                        let i: usize = y as usize * canvas.width + x as usize;
+                        canvas.pixels[i] = color;
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn assert_pixel(
     pixels: &[u32],
-    x: usize,
-    y: usize,
     width: usize,
     height: usize,
-) -> Result<(u8, u8, u8), &'static str> {
+    x: usize,
+    y: usize,
+) -> Result<(), &'static str> {
     if pixels.is_empty() {
         return Err("Array is empty");
     }
@@ -23,11 +94,22 @@ pub fn get_pixel_color(
     if x >= width || y >= height {
         return Err("Coordinates are out of bounds");
     }
-    let pixel = pixels[y * width + x];
-    let red = (pixel >> 16) as u8;
-    let green = (pixel >> 8) as u8;
-    let blue = pixel as u8;
-    Ok((red, green, blue))
+
+    Ok(())
+}
+
+
+pub fn save_ppm_image(canvas: Canvas, path: &str) -> std::io::Result<()> {
+    let mut file = File::create(path)?;
+    let header = format!("P6 {} {} 255\n", canvas.width, canvas.height);
+    file.write_all(header.as_bytes())?;
+    for pixel in &canvas.pixels {
+        let r = ((pixel >> 16) & 0xFF) as u8;
+        let g = ((pixel >> 8) & 0xFF) as u8;
+        let b = (pixel & 0xFF) as u8;
+        file.write_all(&[r, g, b])?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -35,43 +117,72 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_should_fill_all_pixels() {
-        let mut pixels: [u32; 4] = [0; 4];
-        let color = 0x0000FF;
-        fill(&mut pixels, color);
-        for x in pixels {
-            assert_eq!(x, color);
+    fn test_canvas_fill() {
+        let mut canvas = Canvas::new(2, 2);
+        let color = 0xFF0000;
+        canvas.fill(color);
+        for i in 0..canvas.pixels.len() {
+            assert_eq!(canvas.pixels[i], color);
         }
     }
 
+    //    #[test]
+    //    fn test_draw_rect_() {
+    //        let mut pixels: [u32; 4] = [0; 4];
+    //        let color = 0xff0000;
+    //
+    //        draw(&mut pixels,2 ,2, rect(0, 0, 2, 2));
+    //        for x in pixels {
+    //            assert_eq!(x, color);
+    //        }
+    //    }
+
     #[test]
-    fn test_get_pixel_color() {
-        let pixels: [u32; 4] = [0xFF0000; 4];
-        let result = get_pixel_color(&pixels, 2, 2, 2, 2);
+    fn test_set_pixel() {
+        let mut canvas = Canvas::new(2, 2);
+        let result = canvas.set_pixel(2, 2, 0xFF0000);
         assert_eq!(Err("Coordinates are out of bounds"), result);
 
-        let pixels: [u32; 4] = [0xFF0000; 4];
         let expected = Ok((255, 0, 0));
-        let result = get_pixel_color(&pixels, 0, 0, 2, 2);
+        let mut canvas = Canvas::new(2, 2);
+        let set_result = canvas.set_pixel(0, 0, 0xFF0000);
+        assert_eq!(Ok(()), set_result);
+
+        let result = canvas.get_pixel(0, 0);
+        assert_eq!(expected, result);
+    }
+
+    #[test]
+    fn test_get_pixel() {
+        let canvas = Canvas::new(2, 2);
+        let result = canvas.get_pixel(2, 2);
+        assert_eq!(Err("Coordinates are out of bounds"), result);
+
+        let mut canvas = Canvas::new(2, 2);
+        canvas.fill(0xFF0000);
+        let expected = Ok((255, 0, 0));
+        let result = canvas.get_pixel(0, 0);
         assert_eq!(expected, result);
 
-        let pixels: [u32; 4] = [0x00FF00; 4];
+        let mut canvas = Canvas::new(2, 2);
+        canvas.fill(0x00FF00);
         let expected = Ok((0, 255, 0));
-        let result = get_pixel_color(&pixels, 0, 0, 2, 2);
+        let result = canvas.get_pixel(0, 0);
         assert_eq!(expected, result);
 
-        let pixels: [u32; 4] = [0x0000FF; 4];
+        let mut canvas = Canvas::new(2, 2);
+        canvas.fill(0x0000FF);
         let expected = Ok((0, 0, 255));
-        let result = get_pixel_color(&pixels, 0, 0, 2, 2);
-        assert_eq!(expected, result);
-
-        let pixels: [u32; 4] = [0x0000FF; 4];
-        let expected = Ok((0, 0, 255));
-        let result = get_pixel_color(&pixels, 0, 0, 2, 2);
+        let result = canvas.get_pixel(0, 0);
         assert_eq!(expected, result);
 
         let pixels: [u32; 0] = [];
-        let result = get_pixel_color(&pixels, 0, 0, 2, 2);
+        let canvas = Canvas {
+            width: 2,
+            height: 2,
+            pixels: pixels.to_vec(),
+        };
+        let result = canvas.get_pixel(0, 0);
         assert_eq!(Err("Array is empty"), result);
     }
 }
