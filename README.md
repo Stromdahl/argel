@@ -17,4 +17,6 @@ fn main() {
 ```
 ### Examples
 `cargo run --example <example>`
+
 * simple - renders canvas as a ppm image
+* circle - renders a circle as a ppm image
