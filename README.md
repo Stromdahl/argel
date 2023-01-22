@@ -1,5 +1,6 @@
 ## Argel
 Argel is a graphics library for rust with the goal to be as dependency light as posible.
+Work in progress and a learning-rust-project
 
 ## Usage
 `cargo run --example simple`
