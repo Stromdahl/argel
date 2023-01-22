@@ -26,14 +26,14 @@ impl Canvas {
         }
     }
 
-    pub fn draw<F: Fn(&mut Canvas, (isize, isize), u32)>(
+    pub fn draw<F: Fn(&mut Canvas, i32, i32, u32)>(
         &mut self,
-        x: isize,
-        y: isize,
+        x: i32,
+        y: i32,
         draw_fn: F,
         color: u32,
     ) {
-        draw_fn(self, (x, y), color);
+        draw_fn(self, x, y, color);
     }
 
     pub fn get_pixel(&self, x: usize, y: usize) -> Result<(u8, u8, u8), &'static str> {
@@ -54,12 +54,10 @@ impl Canvas {
     }
 }
 
-pub fn rect(w: isize, h: isize) -> impl Fn(&mut Canvas, (isize, isize), u32) {
-    move |canvas: &mut Canvas, position, color| {
-        let (mut x1, mut y1) = position;
-
-        let mut x2: isize = x1 + w.signum() * (w.abs() - 1);
-        let mut y2: isize = y1 + h.signum() * (h.abs() - 1);
+pub fn rect(w: i32, h: i32) -> impl Fn(&mut Canvas, i32, i32, u32) {
+    move |canvas: &mut Canvas, mut x1, mut y1, color| {
+        let mut x2 = x1 + w.signum() * (w.abs() - 1);
+        let mut y2 = y1 + h.signum() * (h.abs() - 1);
         if x1 > x2 {
             std::mem::swap(&mut x1, &mut x2);
         };
@@ -67,12 +65,38 @@ pub fn rect(w: isize, h: isize) -> impl Fn(&mut Canvas, (isize, isize), u32) {
             std::mem::swap(&mut y1, &mut y2);
         };
 
+        // TODO: Make this better, it's not pretty
         for y in y1..=y2 {
-            if 0 <= y && y < canvas.height as isize {
+            if 0 <= y && y < canvas.height as i32 {
                 for x in x1..=x2 {
-                    if 0 <= x && x < canvas.width as isize {
-                        let i: usize = y as usize * canvas.width + x as usize;
+                    if 0 <= x && x < canvas.width as i32 {
+                        let i: usize = (y * canvas.width as i32 + x) as usize;
                         canvas.pixels[i] = color;
+                    }
+                }
+            }
+        }
+    }
+}
+
+pub fn circle(r: i32) -> impl Fn(&mut Canvas, i32, i32, u32) {
+    move |canvas: &mut Canvas, pos_x, pos_y, color| {
+        let x1 = pos_x - r;
+        let y1 = pos_y - r;
+        let x2 = pos_x + r;
+        let y2 = pos_y + r;
+
+        // TODO: Make this better, it's not pretty
+        for y in y1..=y2 {
+            if 0 <= y && y < canvas.height as i32 {
+                for x in x1..=x2 {
+                    if 0 <= x && x < canvas.width as i32 {
+                        let dx = x - pos_x;
+                        let dy = y - pos_y;
+                        if dx * dx + dy * dy <= r * r {
+                            let i: usize = (y * canvas.width as i32 + x) as usize;
+                            canvas.pixels[i] = color;
+                        }
                     }
                 }
             }
@@ -97,7 +121,6 @@ fn assert_pixel(
 
     Ok(())
 }
-
 
 pub fn save_ppm_image(canvas: Canvas, path: &str) -> std::io::Result<()> {
     let mut file = File::create(path)?;
