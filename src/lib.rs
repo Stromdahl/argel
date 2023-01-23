@@ -112,22 +112,14 @@ pub fn rect(w: i32, h: i32) -> impl Fn(&mut Canvas, i32, i32, u32) {
 
 pub fn circle(r: i32) -> impl Fn(&mut Canvas, i32, i32, u32) {
     move |canvas: &mut Canvas, pos_x, pos_y, color| {
-        let x1 = pos_x - r;
-        let y1 = pos_y - r;
-        let x2 = pos_x + r;
-        let y2 = pos_y + r;
-
-        // TODO: Make this better, it's not pretty
-        for y in y1..=y2 {
-            if 0 <= y && y < canvas.height as i32 {
-                for x in x1..=x2 {
-                    if 0 <= x && x < canvas.width as i32 {
-                        let dx = x - pos_x;
-                        let dy = y - pos_y;
-                        if dx * dx + dy * dy <= r * r {
-                            let i: usize = (y * canvas.width as i32 + x) as usize;
-                            canvas.pixels[i] = color;
-                        }
+        if let Some(rect) = nomalize_rect(canvas, pos_x, pos_y, r + r, r + r) {
+            for y in rect.y1..=rect.y2 {
+                for x in rect.x1..=rect.x2 {
+                    let dx = x - pos_x - r;
+                    let dy = y - pos_y - r;
+                    if dx * dx + dy * dy <= r * r {
+                        let i: usize = (y * canvas.width as i32 + x) as usize;
+                        canvas.pixels[i] = color;
                     }
                 }
             }
