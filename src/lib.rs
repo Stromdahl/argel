@@ -1,5 +1,5 @@
 #![warn(clippy::all)]
-use std::{fs::File, io::Write, cmp::min, cmp::max};
+use std::{fs::File, io::Write};
 
 pub struct Canvas {
     pub width: usize,
@@ -61,54 +61,49 @@ impl Canvas {
     }
 }
 
-fn nomalize_rect(canvas: Canvas, mut x: i32, mut y: i32, mut w: i32, mut h: i32) -> Option<NomalizedRect> {
+fn nomalize_rect(
+    canvas: &Canvas,
+    mut x1: i32,
+    mut y1: i32,
+    w: i32,
+    h: i32,
+) -> Option<NomalizedRect> {
     if w == 0 || h == 0 {
         return None;
     }
 
-    let x1 = min(x, x + w).max(0);
-    let x2 = max(x, x + w).min(canvas.width as i32);
-    let y1 = min(y, y + h).max(0);
-    let y2 = max(y, y + h).min(canvas.height as i32);
+    let mut x2 = x1 + w.signum() * (w.abs() - 1);
+    let mut y2 = y1 + h.signum() * (h.abs() - 1);
+    if x1 > x2 {
+        std::mem::swap(&mut x1, &mut x2);
+    };
+    if y1 > y2 {
+        std::mem::swap(&mut y1, &mut y2);
+    };
+
+    if x1 < 0 {
+        x1 = 0
+    };
+    if y1 < 0 {
+        y1 = 0
+    };
+    if x2 >= canvas.width as i32 {
+        x2 = canvas.width as i32 - 1
+    };
+    if y2 >= canvas.height as i32 {
+        y2 = canvas.height as i32 - 1
+    };
 
     Some(NomalizedRect { x1, y1, x2, y2 })
 }
 
-// w = 10;
-// x = 5;
-// 5 + sig(10) * (|10| - 1)
-// 5 + 1 * (9)
-// 14
-//
-// w = -10;
-// x = 5;
-// 5 + sig(10) * (|-10| - 1)
-// 5 + -1 * (9)
-// 5 - 9
-// - 4
-
-// 5 + -9
-// 14 + 0
-
 pub fn rect(w: i32, h: i32) -> impl Fn(&mut Canvas, i32, i32, u32) {
-    move |canvas: &mut Canvas, mut x1, mut y1, color| {
-        let mut x2 = x1 + w.signum() * (w.abs() - 1);
-        let mut y2 = y1 + h.signum() * (h.abs() - 1);
-        if x1 > x2 {
-            std::mem::swap(&mut x1, &mut x2);
-        };
-        if y1 > y2 {
-            std::mem::swap(&mut y1, &mut y2);
-        };
-
-        // TODO: Make this better, it's not pretty
-        for y in y1..=y2 {
-            if 0 <= y && y < canvas.height as i32 {
-                for x in x1..=x2 {
-                    if 0 <= x && x < canvas.width as i32 {
-                        let i: usize = (y * canvas.width as i32 + x) as usize;
-                        canvas.pixels[i] = color;
-                    }
+    move |canvas: &mut Canvas, pos_x, pos_y, color| {
+        if let Some(rect) = nomalize_rect(canvas, pos_x, pos_y, w, h) {
+            for y in rect.y1..=rect.y2 {
+                for x in rect.x1..=rect.x2 {
+                    let i: usize = (y * canvas.width as i32 + x) as usize;
+                    canvas.pixels[i] = color;
                 }
             }
         }
@@ -175,6 +170,56 @@ pub fn save_ppm_image(canvas: Canvas, path: &str) -> std::io::Result<()> {
 mod tests {
     use super::*;
 
+    fn assert_rect(rect: NomalizedRect, rect_expect: NomalizedRect) {
+        assert_eq!(rect.x1, rect_expect.x1);
+        assert_eq!(rect.y1, rect_expect.y1);
+        assert_eq!(rect.x2, rect_expect.x2);
+        assert_eq!(rect.y2, rect_expect.y2);
+    }
+
+    #[test]
+    fn test_normalize_rect() {
+        let canvas = Canvas::new(20, 20);
+        let Some(rect) = nomalize_rect(&canvas, 2, 2, 2, 2) else {todo!()};
+        let expect: NomalizedRect = NomalizedRect {
+            x1: 2,
+            y1: 2,
+            x2: 3,
+            y2: 3,
+        };
+        assert_rect(rect, expect);
+
+        let canvas = Canvas::new(20, 20);
+        let Some(rect) = nomalize_rect(&canvas, 2, 2, -2, -2) else {todo!()};
+        let expect: NomalizedRect = NomalizedRect {
+            x1: 1,
+            y1: 1,
+            x2: 2,
+            y2: 2,
+        };
+        assert_rect(rect, expect);
+
+        let canvas = Canvas::new(20, 20);
+        let Some(rect) = nomalize_rect(&canvas, 1, 1, -2, -2) else {todo!()};
+        let expect: NomalizedRect = NomalizedRect {
+            x1: 0,
+            y1: 0,
+            x2: 1,
+            y2: 1,
+        };
+        assert_rect(rect, expect);
+
+        let canvas = Canvas::new(20, 20);
+        let Some(rect) = nomalize_rect(&canvas, 18, 18, 4, 4) else {todo!()};
+        let expect: NomalizedRect = NomalizedRect {
+            x1: 18,
+            y1: 18,
+            x2: 19,
+            y2: 19,
+        };
+        assert_rect(rect, expect);
+    }
+
     #[test]
     fn test_canvas_fill() {
         let mut canvas = Canvas::new(2, 2);
@@ -239,6 +284,7 @@ mod tests {
         let canvas = Canvas {
             width: 2,
             height: 2,
+            stride: 2,
             pixels: pixels.to_vec(),
         };
         let result = canvas.get_pixel(0, 0);
