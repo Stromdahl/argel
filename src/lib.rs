@@ -1,11 +1,18 @@
 #![warn(clippy::all)]
-use std::{fs::File, io::Write};
+use std::{fs::File, io::Write, cmp::min, cmp::max};
 
 pub struct Canvas {
     pub width: usize,
     pub height: usize,
     pub stride: usize,
     pub pixels: Vec<u32>,
+}
+
+struct NomalizedRect {
+    x1: i32,
+    y1: i32,
+    x2: i32,
+    y2: i32,
 }
 
 impl Canvas {
@@ -53,6 +60,35 @@ impl Canvas {
         Ok(())
     }
 }
+
+fn nomalize_rect(canvas: Canvas, mut x: i32, mut y: i32, mut w: i32, mut h: i32) -> Option<NomalizedRect> {
+    if w == 0 || h == 0 {
+        return None;
+    }
+
+    let x1 = min(x, x + w).max(0);
+    let x2 = max(x, x + w).min(canvas.width as i32);
+    let y1 = min(y, y + h).max(0);
+    let y2 = max(y, y + h).min(canvas.height as i32);
+
+    Some(NomalizedRect { x1, y1, x2, y2 })
+}
+
+// w = 10;
+// x = 5;
+// 5 + sig(10) * (|10| - 1)
+// 5 + 1 * (9)
+// 14
+//
+// w = -10;
+// x = 5;
+// 5 + sig(10) * (|-10| - 1)
+// 5 + -1 * (9)
+// 5 - 9
+// - 4
+
+// 5 + -9
+// 14 + 0
 
 pub fn rect(w: i32, h: i32) -> impl Fn(&mut Canvas, i32, i32, u32) {
     move |canvas: &mut Canvas, mut x1, mut y1, color| {
