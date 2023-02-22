@@ -1,12 +1,11 @@
 use std::time::Instant;
-
 extern crate argel;
 
 fn main() {
     const WIDTH: usize = 800;
     const HEIGHT: usize = 800;
     const R: i32 = 50;
-    let mut canvas = argel::Canvas::new(WIDTH, HEIGHT);
+    let mut canvas = argel::canvas::Canvas::new(WIDTH, HEIGHT);
     let mut count = 0;
     let now = Instant::now();
     for y in 0..HEIGHT as i32 / R / 2 {
