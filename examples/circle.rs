@@ -1,6 +1,7 @@
 use std::time::Instant;
 extern crate argel;
 
+const IMAGE_PATH: &str = "circle.ppm";
 fn main() {
     const WIDTH: usize = 800;
     const HEIGHT: usize = 800;
@@ -18,15 +19,9 @@ fn main() {
         count += 1;
     }
     let elapsed_time = now.elapsed();
-    println!(
-        "Circles done after {}ms",
-        elapsed_time.as_millis()
-    );
-    let path = "circle.ppm";
-    argel::save_ppm_image(canvas, path).unwrap();
+    println!("Circles done after {}ms", elapsed_time.as_millis());
+    argel::output::save_ppm_image(canvas.pixels, canvas.width, canvas.height, IMAGE_PATH).unwrap();
+
     let elapsed_time = now.elapsed();
-    println!(
-        "Saving done after {}ms",
-        elapsed_time.as_millis()
-    );
+    println!("Saving done after {}ms", elapsed_time.as_millis());
 }

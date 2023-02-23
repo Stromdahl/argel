@@ -1,5 +1,5 @@
 #![warn(clippy::all)]
-use std::{fs::File, io::Write};
+pub mod output;
 
 pub mod canvas {
     pub struct Canvas {
@@ -73,52 +73,54 @@ pub mod canvas {
     }
 }
 
-struct NomalizedRect {
-    x1: i32,
-    y1: i32,
-    x2: i32,
-    y2: i32,
-}
-
-fn nomalize_rect(
-    canvas: &crate::canvas::Canvas,
-    mut x1: i32,
-    mut y1: i32,
-    w: i32,
-    h: i32,
-) -> Option<NomalizedRect> {
-    if w == 0 || h == 0 {
-        return None;
+pub mod rect {
+    pub struct NomalizedRect {
+        pub x1: i32,
+        pub y1: i32,
+        pub x2: i32,
+        pub y2: i32,
     }
 
-    let mut x2 = x1 + w.signum() * (w.abs() - 1);
-    let mut y2 = y1 + h.signum() * (h.abs() - 1);
-    if x1 > x2 {
-        std::mem::swap(&mut x1, &mut x2);
-    };
-    if y1 > y2 {
-        std::mem::swap(&mut y1, &mut y2);
-    };
+    pub fn nomalize_rect(
+        canvas: &crate::canvas::Canvas,
+        mut x1: i32,
+        mut y1: i32,
+        w: i32,
+        h: i32,
+    ) -> Option<NomalizedRect> {
+        if w == 0 || h == 0 {
+            return None;
+        }
 
-    if x1 < 0 {
-        x1 = 0
-    };
-    if y1 < 0 {
-        y1 = 0
-    };
-    if x2 >= canvas.width as i32 {
-        x2 = canvas.width as i32 - 1
-    };
-    if y2 >= canvas.height as i32 {
-        y2 = canvas.height as i32 - 1
-    };
+        let mut x2 = x1 + w.signum() * (w.abs() - 1);
+        let mut y2 = y1 + h.signum() * (h.abs() - 1);
+        if x1 > x2 {
+            std::mem::swap(&mut x1, &mut x2);
+        };
+        if y1 > y2 {
+            std::mem::swap(&mut y1, &mut y2);
+        };
 
-    Some(NomalizedRect { x1, y1, x2, y2 })
+        if x1 < 0 {
+            x1 = 0
+        };
+        if y1 < 0 {
+            y1 = 0
+        };
+        if x2 >= canvas.width as i32 {
+            x2 = canvas.width as i32 - 1
+        };
+        if y2 >= canvas.height as i32 {
+            y2 = canvas.height as i32 - 1
+        };
+
+        Some(NomalizedRect { x1, y1, x2, y2 })
+    }
 }
 
 pub fn rect(w: i32, h: i32) -> impl Fn(&mut crate::canvas::Canvas, i32, i32, u32) {
     move |canvas: &mut crate::canvas::Canvas, pos_x, pos_y, color| {
-        if let Some(rect) = nomalize_rect(canvas, pos_x, pos_y, w, h) {
+        if let Some(rect) = crate::rect::nomalize_rect(canvas, pos_x, pos_y, w, h) {
             for y in rect.y1..=rect.y2 {
                 for x in rect.x1..=rect.x2 {
                     let i: usize = (y * canvas.width as i32 + x) as usize;
@@ -131,7 +133,7 @@ pub fn rect(w: i32, h: i32) -> impl Fn(&mut crate::canvas::Canvas, i32, i32, u32
 
 pub fn circle(r: i32) -> impl Fn(&mut crate::canvas::Canvas, i32, i32, u32) {
     move |canvas: &mut crate::canvas::Canvas, pos_x, pos_y, color| {
-        if let Some(rect) = nomalize_rect(canvas, pos_x, pos_y, r + r, r + r) {
+        if let Some(rect) = crate::rect::nomalize_rect(canvas, pos_x, pos_y, r + r, r + r) {
             for y in rect.y1..=rect.y2 {
                 for x in rect.x1..=rect.x2 {
                     let dx = x - pos_x - r;
@@ -145,24 +147,11 @@ pub fn circle(r: i32) -> impl Fn(&mut crate::canvas::Canvas, i32, i32, u32) {
         }
     }
 }
-
-pub fn save_ppm_image(canvas: crate::canvas::Canvas, path: &str) -> std::io::Result<()> {
-    let mut file = File::create(path)?;
-    let header = format!("P6 {} {} 255\n", canvas.width, canvas.height);
-    file.write_all(header.as_bytes())?;
-    for pixel in &canvas.pixels {
-        let r = ((pixel >> 16) & 0xFF) as u8;
-        let g = ((pixel >> 8) & 0xFF) as u8;
-        let b = (pixel & 0xFF) as u8;
-        file.write_all(&[r, g, b])?;
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::canvas::Canvas;
+    use crate::rect::nomalize_rect;
+    use crate::rect::NomalizedRect;
     fn assert_rect(rect: NomalizedRect, rect_expect: NomalizedRect) {
         assert_eq!(rect.x1, rect_expect.x1);
         assert_eq!(rect.y1, rect_expect.y1);
