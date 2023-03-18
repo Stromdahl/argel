@@ -1,5 +1,6 @@
 #![warn(clippy::all)]
 pub mod output;
+pub mod color; 
 
 pub mod canvas {
     pub struct Canvas {
